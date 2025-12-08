@@ -1,123 +1,164 @@
 # seating/views_seating.py
 
-from django.http import JsonResponse
-from seating.models import (
-    Student, ExamSchedule, Classroom, SeatAllocation
-)
+from django.http import JsonResponse, HttpResponseBadRequest
+from django.shortcuts import get_object_or_404
 from django.db import transaction
 
+from .models import (
+    ExamSchedule,
+    SeatAllocation,
+    Classroom,
+    Student,
+)
 
+
+def _students_for_semester_number(sem_number):
+    """Return queryset/list of Student objects for a Semester number, ordered by USN."""
+    return list(Student.objects.filter(semester__number=sem_number).order_by('usn'))
+
+
+@transaction.atomic
 def generate_seating(request, schedule_id):
+    """
+    Generate seating for the given ExamSchedule id.
 
-    try:
-        schedule = ExamSchedule.objects.get(id=schedule_id)
-    except ExamSchedule.DoesNotExist:
-        return JsonResponse({"error": "Schedule not found"}, status=404)
+    Behavior:
+      - Auto-assign classrooms ordered by room_number (ascending).
+      - If two semesters share the exact same exam_day + start_time + end_time,
+        they are paired: left = lower-number semester, right = higher-number semester.
+      - If only one semester is present at that slot, each bench is single (seat_side='S').
+      - When a classroom's benches are exhausted, continue to next classroom.
+      - Existing SeatAllocation rows for this exam_schedule are deleted before generation.
+    """
 
-    exam_day = schedule.exam_day
-    semester = schedule.subject.semester
+    schedule = get_object_or_404(ExamSchedule, id=schedule_id)
 
-    # FETCH ALL STUDENTS WHO HAVE THIS SUBJECT (current semester)
-    students = list(Student.objects.filter(semester=semester).order_by("usn"))
-
-    # Check if any other semester has exam at SAME TIME
-    same_time_schedules = ExamSchedule.objects.filter(
-        exam_day=exam_day,
+    # find all schedules that are at the same day + exact same time window
+    same_slot_qs = ExamSchedule.objects.filter(
+        exam_day=schedule.exam_day,
         start_time=schedule.start_time,
-        end_time=schedule.end_time
+        end_time=schedule.end_time,
+    ).order_by('id')
+
+    # Determine distinct semester numbers participating in this slot
+    sem_numbers = sorted(
+        set(same_slot_qs.values_list('subject__semester__number', flat=True))
     )
 
-    mixed_semesters = list(
-        same_time_schedules.values_list("subject__semester__number", flat=True)
-    )
+    # Classrooms in auto order (room_number ascending). If room_number is text, ensure desired ordering.
+    classrooms = list(Classroom.objects.all().order_by('room_number'))
 
-    # Example: [3, 5] -> mix, [7] -> single
-    mixed_semesters = sorted(list(set(mixed_semesters)))
+    if not classrooms:
+        return JsonResponse({"status": "error", "message": "No classrooms defined"}, status=400)
 
-    classrooms = list(Classroom.objects.order_by("room_number"))
+    # Clear previous allocations for this exact schedule (to allow re-generate)
+    SeatAllocation.objects.filter(exam_schedule=schedule).delete()
 
-    # Clear previous allocations for this schedule
-    SeatAllocation.objects.filter(schedule=schedule).delete()
+    allocations_to_create = []
 
-    bench_counter = 1
-
-    @transaction.atomic
-    def allocate_single_sem(single_students):
-        nonlocal bench_counter
-
-        for student in single_students:
-            for room in classrooms:
-                if bench_counter <= room.num_benches:
-                    SeatAllocation.objects.create(
-                        student=student,
-                        schedule=schedule,
-                        classroom=room,
-                        bench_number=bench_counter,
-                        seat_position="single"
-                    )
-                    bench_counter += 1
-                    break
-                else:
-                    bench_counter = 1
-                    continue
-
-    @transaction.atomic
-    def allocate_mixed(sem_a, sem_b):
-        nonlocal bench_counter
-
-        list_a = list(Student.objects.filter(semester__number=sem_a).order_by("usn"))
-        list_b = list(Student.objects.filter(semester__number=sem_b).order_by("usn"))
-
-        max_len = max(len(list_a), len(list_b))
-
-        i = 0
-        j = 0
-
+    # Helper: iterate classrooms, benches, and generate SeatAllocation objects (appended then bulk_create)
+    def allocate_single_sem(students):
+        """One student per bench (seat_side='S')."""
+        idx = 0
         for room in classrooms:
-            bench_counter = 1
-
-            while bench_counter <= room.num_benches and (i < len(list_a) or j < len(list_b)):
-
-                # LEFT SEAT → semester A
-                if i < len(list_a):
-                    SeatAllocation.objects.create(
-                        student=list_a[i],
-                        schedule=schedule,
+            for bench in range(1, room.benches + 1):
+                if idx >= len(students):
+                    return
+                student = students[idx]
+                allocations_to_create.append(
+                    SeatAllocation(
+                        student=student,
+                        exam_schedule=schedule,
                         classroom=room,
-                        bench_number=bench_counter,
-                        seat_position="left"
+                        bench_number=bench,
+                        seat_side='S',  # single occupant
                     )
-                i += 1
+                )
+                idx += 1
 
-                # RIGHT SEAT → semester B
-                if j < len(list_b):
-                    SeatAllocation.objects.create(
-                        student=list_b[j],
-                        schedule=schedule,
-                        classroom=room,
-                        bench_number=bench_counter,
-                        seat_position="right"
+    def allocate_paired(sem_a, sem_b):
+        """
+        Pair sem_a -> Left (L) and sem_b -> Right (R) on same bench.
+        If one list is longer, remaining students are put on Left (L) positions only.
+        """
+        list_a = _students_for_semester_number(sem_a)  # left
+        list_b = _students_for_semester_number(sem_b)  # right
+
+        ia = 0
+        ib = 0
+
+        # walk through rooms
+        for room in classrooms:
+            for bench in range(1, room.benches + 1):
+                placed = False
+
+                # PLACE left (sem_a) if available
+                if ia < len(list_a):
+                    allocations_to_create.append(
+                        SeatAllocation(
+                            student=list_a[ia],
+                            exam_schedule=schedule,
+                            classroom=room,
+                            bench_number=bench,
+                            seat_side='L',
+                        )
                     )
-                j += 1
+                    ia += 1
+                    placed = True
 
-                bench_counter += 1
+                # PLACE right (sem_b) if available
+                if ib < len(list_b):
+                    allocations_to_create.append(
+                        SeatAllocation(
+                            student=list_b[ib],
+                            exam_schedule=schedule,
+                            classroom=room,
+                            bench_number=bench,
+                            seat_side='R',
+                        )
+                    )
+                    ib += 1
+                    placed = True
 
-            if i >= len(list_a) and j >= len(list_b):
-                break
+                # if no student in either list, we may finish early
+                if ia >= len(list_a) and ib >= len(list_b):
+                    return
 
-    # CASE 1 — MIXED SEMESTERS (e.g. 3rd + 5th same time)
-    if len(mixed_semesters) == 2:
-        sem1 = mixed_semesters[0]
-        sem2 = mixed_semesters[1]
+        # if after walking all rooms still students remain (rare if not enough benches),
+        # continue assigning by creating extra benches in no room — but ideally classrooms should be enough.
+        # Here we simply stop (you can add more classrooms in admin).
+        return
 
-        allocate_mixed(sem1, sem2)
+    # Decide allocation path based on sem_numbers
+    if len(sem_numbers) == 0:
+        return JsonResponse({"status": "error", "message": "No semester found for this schedule"}, status=400)
 
-    # CASE 2 — ONLY THIS SEMESTER HAS EXAM
-    else:
+    # If exactly 2 distinct semesters at same slot -> pair them
+    if len(sem_numbers) == 2:
+        sem_a, sem_b = sem_numbers[0], sem_numbers[1]
+        allocate_paired(sem_a, sem_b)
+
+    # If only 1 semester present -> single occupancy per bench
+    elif len(sem_numbers) == 1:
+        sem = sem_numbers[0]
+        students = _students_for_semester_number(sem)
         allocate_single_sem(students)
+
+    # If more than 2 semesters share a time (unlikely), we default to single-seat allocation for each semester in order:
+    else:
+        # flatten students in sem order and allocate single bench per student
+        combined = []
+        for sem in sem_numbers:
+            combined.extend(_students_for_semester_number(sem))
+        allocate_single_sem(combined)
+
+    # Bulk create allocations
+    if allocations_to_create:
+        SeatAllocation.objects.bulk_create(allocations_to_create)
 
     return JsonResponse({
         "status": "success",
-        "message": "Seating allocation completed",
-        "schedule": schedule_id
+        "message": "Seating allocation generated",
+        "created": len(allocations_to_create),
+        "schedule_id": schedule_id,
     })

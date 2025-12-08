@@ -1,7 +1,5 @@
-# seating/urls.py
-
 from django.urls import path
-from .views_seating import generate_seating   # import the function
+from .views_seating import generate_seating
 
 app_name = "seating"
 
