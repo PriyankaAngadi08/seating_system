@@ -4,6 +4,8 @@ from .views_seating import frontend_test
 from .views_seating import home
 from . import views
 
+
+
 app_name = "seating"
 
 
@@ -38,5 +40,6 @@ urlpatterns = [
     frontend_test,
     name="test_frontend",
 ),
+
 
 ]

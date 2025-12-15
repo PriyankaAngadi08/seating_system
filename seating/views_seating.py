@@ -178,3 +178,4 @@ def classroom_layout_view(request, classroom_id):
             "benches": benches,
         }
     )
+
