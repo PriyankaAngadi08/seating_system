@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Seating System</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'seating/style.css' %}">
+</head>
+<body>
+
+<h1>Virtual Seating Arrangement System</h1>
+
+<h3>Select Exam Schedule</h3>
+
+<ul>
+    {% for schedule in schedules %}
+        <li>
+            {{ schedule }}
+            →
+            <a href="{% url 'seating:generate_seating' schedule.id %}">
+                Generate Seating
+            </a>
+        </li>
+    {% endfor %}
+</ul>
+
+</body>
+</html>

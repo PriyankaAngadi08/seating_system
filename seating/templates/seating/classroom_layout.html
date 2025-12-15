@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Classroom Layout</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'seating/style.css' %}">
+</head>
+<body>
+
+<h2 style="text-align:center;">
+    Classroom {{ classroom.room_number }} – Seating Layout
+</h2>
+
+<div style="
+    width:80%;
+    margin:20px auto;
+    padding:15px;
+    background:#2c3e50;
+    color:white;
+    text-align:center;
+    font-weight:bold;
+">
+    BLACKBOARD
+</div>
+
+<table border="1" cellpadding="15" style="
+    margin:auto;
+    width:70%;
+    background:white;
+    text-align:center;
+">
+    <tr>
+        <th>Bench</th>
+        <th>Left Student</th>
+        <th>Right Student</th>
+    </tr>
+
+    {% for bench_no, seats in benches.items %}
+    <tr>
+        <td>{{ bench_no }}</td>
+        <td>
+            {% if seats.left %}
+                {{ seats.left.name }}<br>
+                <small>{{ seats.left.usn }}</small>
+            {% else %}
+                —
+            {% endif %}
+        </td>
+        <td>
+            {% if seats.right %}
+                {{ seats.right.name }}<br>
+                <small>{{ seats.right.usn }}</small>
+            {% else %}
+                —
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+
+<br>
+<div style="text-align:center;">
+    <a href="javascript:history.back()">⬅ Back</a>
+</div>
+
+</body>
+</html>

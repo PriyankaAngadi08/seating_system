@@ -102,3 +102,4 @@ class SeatAllocation(models.Model):
     def __str__(self):
         side = dict(SEAT_SIDE_CHOICES).get(self.seat_side, self.seat_side)
         return f"{self.student.usn} -> {self.classroom.room_number} bench {self.bench_number} ({side})"
+

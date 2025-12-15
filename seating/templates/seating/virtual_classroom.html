@@ -1,0 +1,39 @@
+{% extends "seating/base.html" %}
+
+{% block content %}
+<h2 class="title">Virtual Classroom – Exam Seating</h2>
+
+<div class="classroom">
+
+    <div class="board">BLACKBOARD</div>
+
+    <div class="seating-area">
+        {% for bench in benches %}
+        <div class="bench">
+
+     <div class="seat left">
+    {% if bench.left_student %}
+        <strong>{{ bench.left_student.name }}</strong><br>
+        {{ bench.left_student.usn }}<br>
+        Sem {{ bench.left_student.semester.number }}
+    {% else %}
+        <em>Empty</em>
+    {% endif %}
+</div>
+
+<div class="seat right">
+    {% if bench.right_student %}
+        <strong>{{ bench.right_student.name }}</strong><br>
+        {{ bench.right_student.usn }}<br>
+        Sem {{ bench.right_student.semester.number }}
+    {% else %}
+        <em>Empty</em>
+    {% endif %}
+</div>
+
+        </div>
+        {% endfor %}
+    </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,29 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Virtual Seating Arrangement</title>
+
+    <!-- Classroom CSS -->
+    <link rel="stylesheet" href="{% static 'seating/classroom.css' %}">
+
+    <!-- Common CSS (optional) -->
+    <link rel="stylesheet" href="{% static 'seating/css/style.css' %}">
+</head>
+
+<body>
+
+<header>
+    <h1>Virtual Seating Arrangement System</h1>
+</header>
+
+<main>
+    {% block content %}
+    {% endblock %}
+</main>
+
+<!-- Classroom JS -->
+<script src="{% static 'seating/js/classroom.js' %}"></script>
+
+</body>
+</html>

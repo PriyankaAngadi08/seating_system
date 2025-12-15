@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    
+
+    <title>Virtual Seating Arrangement</title>
+
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'seating/style.css' %}">
+    
+</head>
+<body>
+<a href="{% url 'seating:home' %}">← Back to Home</a>
+<h1>Virtual Seating Arrangement</h1>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="message">{{ message }}</div>
+    {% endfor %}
+{% endif %}
+
+{% if allocations %}
+
+<table border="1" cellpadding="8">
+    <thead>
+        <tr>
+            <th>USN</th>
+            <th>Name</th>
+            <th>Room</th>
+            <th>Bench</th>
+            <th>Seat Side</th>
+        </tr>
+    </thead>
+
+    <tbody id="seat-body">
+        {% for a in allocations %}
+        <tr class="draggable" draggable="true">
+            <td>{{ a.student.usn }}</td>
+            <td>{{ a.student.name }}</td>
+            <td>{{ a.classroom.room_number }}</td>
+            <td>{{ a.bench_number }}</td>
+            <td>{{ a.seat_side }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<br>
+
+<form method="post" action="{% url 'seating:send_emails' schedule.id %}">
+    {% csrf_token %}
+    <button type="submit" {% if all_emailed %}disabled{% endif %}>
+        Send Email to Students
+    </button>
+</form>
+
+{% if all_emailed %}
+    <p style="text-align:center; color:gray;">
+        Emails already sent
+    </p>
+{% endif %}
+
+{% else %}
+<p>No seating data available.</p>
+{% endif %}
+
+<script src="{% static 'seating/drag.js' %}"></script>
+{% if allocations %}
+   <a href="{% url 'seating:virtual_classroom' schedule.id %}">
+    <button>View Classroom Layout</button>
+</a>
+
+{% endif %}
+</body>
+</html>

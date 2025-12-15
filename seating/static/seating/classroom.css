@@ -1,0 +1,72 @@
+body {
+    background: #f4f6f8;
+}
+
+/* Title */
+.title {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+/* Classroom */
+.classroom {
+    width: 90%;
+    margin: auto;
+    background: #eaeaea;
+    padding: 20px;
+    border-radius: 10px;
+}
+
+/* Blackboard */
+.board {
+    background: #1f3d2b;
+    color: white;
+    text-align: center;
+    padding: 12px;
+    font-weight: bold;
+    margin-bottom: 30px;
+    border-radius: 5px;
+}
+
+/* Seating area */
+.seating-area {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 30px;
+}
+
+/* Bench */
+.bench {
+    background: #8b5a2b;
+    padding: 10px;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+}
+
+/* Seats */
+.seat {
+    width: 48%;
+    background: #fff;
+    border-radius: 5px;
+    padding: 6px;
+    text-align: center;
+    font-size: 12px;
+}
+
+/* Left & Right differentiation */
+.left {
+    border-left: 5px solid #3498db;
+}
+
+.right {
+    border-right: 5px solid #e74c3c;
+}
+
+.name {
+    font-weight: bold;
+}
+
+.usn, .sem {
+    font-size: 11px;
+}
